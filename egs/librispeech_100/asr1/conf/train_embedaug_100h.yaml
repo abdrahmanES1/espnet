@@ -1,0 +1,37 @@
+# --- ARCHITECTURE CHANGES  ---
+adim: 256             # Paper uses 256 for 100h 
+aheads: 4             # Paper uses 4 for 100h 
+eunits: 2048          
+dunits: 2048          
+embed_aug_p: 60
+# --- BATCHING  ---
+batch-size: 64        # Paper uses 64 for 100h
+accum-grad: 1         # Usually 1 for 100h when batch-size is 64
+
+# --- STANDARD PARAMETERS (Keep these) ---
+backend: pytorch
+maxlen-in: 512
+maxlen-out: 150
+dlayers: 6
+dropout-rate: 0.1
+elayers: 12
+epochs: 50            # 100h usually converges faster than 120 epochs
+grad-clip: 5
+lsm-weight: 0.1
+model-module: espnet.nets.pytorch_backend.e2e_asr_conformer:E2E
+mtlalpha: 0.3         # Paper specifies 0.3 
+opt: noam
+patience: 0
+sortagrad: 0
+transformer-attn-dropout-rate: 0.0
+transformer-init: pytorch
+transformer-input-layer: conv2d  # CRITICAL: Triggers the code block where you added EmbedAug
+transformer-length-normalized-loss: false
+transformer-lr: 10.0
+transformer-warmup-steps: 25000
+transformer-encoder-activation-type: swish
+transformer-encoder-pos-enc-layer-type: rel_pos
+transformer-encoder-selfattn-layer-type: rel_selfattn
+macaron-style: true
+use-cnn-module: true
+cnn-module-kernel: 31

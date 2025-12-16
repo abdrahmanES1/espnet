@@ -36,6 +36,36 @@ from espnet2.legacy.nets.pytorch_backend.transformer.subsampling import (
     Conv2dSubsampling,
 )
 
+import math
+class EmbedAug(torch.nn.Module):
+    def __init__(self, p=60, mix_strategy=True):
+        super(EmbedAug, self).__init__()
+        self.p = p
+        self.mix_strategy = mix_strategy
+
+    def forward(self, x):
+        # x: (Batch, Time, Dim)
+        if not self.training or self.p <= 0:
+            return x
+
+        B, T2, M = x.shape
+        k = int(math.floor((self.p / 100) * T2))
+        if k == 0: return x
+
+        x_aug = x.clone()
+        for b in range(B):
+            # 1. Randomly select k indices without repetition
+            indices = torch.randperm(T2, device=x.device)[:k]
+            
+            # 2. Mix Strategy: 50% Zeros, 50% Noise
+            if self.mix_strategy and (torch.rand(1).item() < 0.5):
+                # Gaussian Noise
+                noise = torch.randn(k, M, device=x.device)
+                x_aug[b, indices, :] = noise
+            else:
+                # Zeros
+                x_aug[b, indices, :] = 0.0
+        return x_aug
 
 class Encoder(torch.nn.Module):
     """Conformer encoder module.
@@ -100,6 +130,7 @@ class Encoder(torch.nn.Module):
         intermediate_layers=None,
         ctc_softmax=None,
         conditioning_layer_dim=None,
+        embed_aug_p=0, 
     ):
         """Construct an Encoder object."""
         super(Encoder, self).__init__()
@@ -153,6 +184,13 @@ class Encoder(torch.nn.Module):
             )
         else:
             raise ValueError("unknown input_layer: " + input_layer)
+        
+        # Initialize EmbedAug. 
+        # Using p=60 as recommended for Librispeech (Source [4])
+        # Using p=20 as recommended for MUCS-21 (Source [5])
+        # You can hardcode 60 here, or pass it as an argument if you modify the init args.
+        self.embed_aug = EmbedAug(p=embed_aug_p, mix_strategy=True)
+
         self.normalize_before = normalize_before
 
         # self-attention module definition
@@ -258,6 +296,11 @@ class Encoder(torch.nn.Module):
             xs, masks = self.embed(xs, masks)
         else:
             xs = self.embed(xs)
+        
+        # Apply EmbedAug before the encoder blocks
+        
+        if self.embed_aug is not None:
+            xs = self.embed_aug(xs)
 
         if self.intermediate_layers is None:
             xs, masks = self.encoders(xs, masks)
